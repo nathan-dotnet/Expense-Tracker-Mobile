@@ -1,0 +1,88 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                   String    @id @default(uuid())
+  name                 String
+  email                String    @unique
+  password             String
+  currency             String    @default("USD")
+  avatar               String?
+  notificationsEnabled Boolean   @default(true)
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+
+  expenses  Expense[]
+  budgets   Budget[]
+  insights  Insight[]
+
+  @@map("Users")
+}
+
+model Expense {
+  id              String   @id @default(uuid())
+  userId          String
+  title           String
+  amount          Float
+  currency        String   @default("USD")
+  category        String
+  date            DateTime
+  notes           String?
+  tags            String? // comma-separated
+  isRecurring     Boolean  @default(false)
+  recurringInterval String?
+  paymentMethod   String   @default("other")
+  receiptFilename String?
+  receiptUrl      String?
+  receiptOcrText  String?
+  receiptProcessedAt DateTime?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, date])
+  @@index([userId, category])
+  @@map("Expenses")
+}
+
+model Budget {
+  id             String   @id @default(uuid())
+  userId         String
+  category       String
+  amount         Float
+  period         String   @default("monthly")
+  month          Int?
+  year           Int?
+  alertThreshold Int      @default(80)
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, category])
+  @@map("Budgets")
+}
+
+model Insight {
+  id        String   @id @default(uuid())
+  userId    String
+  month     Int
+  year      Int
+  content   String
+  summary   String
+  tips      String // JSON array
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, year, month])
+  @@map("Insights")
+}
