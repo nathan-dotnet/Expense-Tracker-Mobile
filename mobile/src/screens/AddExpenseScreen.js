@@ -23,7 +23,6 @@ import {
   COLORS,
   PAYMENT_METHODS,
 } from "../constants/theme";
-import { receiptsAPI } from "../services/api";
 import { createExpense, fetchSummary } from "../store/expensesSlice";
 
 export default function AddExpenseScreen({ navigation, route }) {
@@ -75,22 +74,15 @@ export default function AddExpenseScreen({ navigation, route }) {
   const processReceiptOCR = async (uri) => {
     setIsProcessingReceipt(true);
     try {
-      const res = await receiptsAPI.upload(uri);
-      const { suggestedAmount } = res.data.data;
-      if (suggestedAmount && !amount) {
-        setAmount(suggestedAmount.toString());
-        Toast.show({
-          type: "success",
-          text1: "Receipt scanned",
-          text2: `Detected amount: $${suggestedAmount}`,
-        });
-      } else {
-        Toast.show({ type: "success", text1: "Receipt uploaded" });
-      }
+      Toast.show({
+        type: "success",
+        text1: "Receipt saved locally",
+        text2: "Offline mode keeps receipt images on this device.",
+      });
     } catch (err) {
       Toast.show({
-        type: "error",
-        text1: "Could not process receipt",
+        type: "info",
+        text1: "Receipt kept locally",
         text2: "You can still enter details manually",
       });
     } finally {
@@ -113,17 +105,12 @@ export default function AddExpenseScreen({ navigation, route }) {
         date: date.toISOString(),
         notes: notes.trim() || undefined,
         paymentMethod,
+        receiptUrl: receiptImage || undefined,
       }),
     );
     setIsSubmitting(false);
 
     if (result.meta.requestStatus === "fulfilled") {
-      // Attach receipt if one was captured
-      if (receiptImage) {
-        try {
-          await receiptsAPI.upload(receiptImage, result.payload.id);
-        } catch (e) {}
-      }
       // Refresh summary so dashboard updates immediately
       dispatch(fetchSummary({}));
       Toast.show({ type: "success", text1: "Expense added!" });

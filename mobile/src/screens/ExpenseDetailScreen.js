@@ -19,7 +19,7 @@ import {
   COLORS,
   PAYMENT_METHODS,
 } from "../constants/theme";
-import { expensesAPI } from "../services/api";
+import { getExpenseById } from "../services/localDb";
 import { deleteExpense } from "../store/expensesSlice";
 import { getCurrencySymbol } from "../utils/currency";
 
@@ -31,9 +31,8 @@ export default function ExpenseDetailScreen({ navigation, route }) {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    expensesAPI
-      .getById(id)
-      .then((res) => setExpense(res.data.data))
+    getExpenseById(id)
+      .then((data) => setExpense(data))
       .catch(() =>
         Toast.show({ type: "error", text1: "Failed to load expense" }),
       )

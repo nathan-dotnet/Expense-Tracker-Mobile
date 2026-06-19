@@ -8,8 +8,9 @@
     "userInterfaceStyle": "automatic",
     "splash": {
       "image": "./assets/splash.png",
+      "imageWidth": 5000,
       "resizeMode": "contain",
-      "backgroundColor": "#6C63FF"
+      "backgroundColor": "#F8FAFC"
     },
     "assetBundlePatterns": ["**/*"],
     "ios": {
@@ -27,9 +28,10 @@
       },
       "package": "com.yourcompany.expensetracker",
       "permissions": [
-        "READ_EXTERNAL_STORAGE",
-        "WRITE_EXTERNAL_STORAGE",
-        "CAMERA"
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.WRITE_EXTERNAL_STORAGE",
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO"
       ]
     },
     "web": {
@@ -44,6 +46,11 @@
         }
       ]
     ],
-    "scheme": "expensetracker"
+    "scheme": "expensetracker",
+    "extra": {
+      "eas": {
+        "projectId": "15363c58-fa6b-4471-a452-04f1f8c093be"
+      }
+    }
   }
 }

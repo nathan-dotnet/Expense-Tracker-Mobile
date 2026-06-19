@@ -145,16 +145,6 @@ export default function HomeScreen({ navigation }) {
             </View>
             <Text style={styles.actionLabel}>Scan Receipt</Text>
           </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.actionButton}
-            onPress={() => navigation.navigate("Insights")}
-          >
-            <View style={[styles.actionIcon, { backgroundColor: "#A78BFA" }]}>
-              <Ionicons name="bulb" size={22} color={COLORS.white} />
-            </View>
-            <Text style={styles.actionLabel}>AI Insights</Text>
-          </TouchableOpacity>
         </View>
 
         {/* Category breakdown chart */}
