@@ -6,10 +6,12 @@ import { Ionicons } from '@expo/vector-icons';
 import Toast from 'react-native-toast-message';
 import { fetchBudgets, saveBudget } from '../store/budgetsSlice';
 import { COLORS, CATEGORIES, CATEGORY_COLORS, CATEGORY_ICONS } from '../constants/theme';
+import { getCurrencySymbol } from '../utils/currency';
 
 export default function BudgetScreen() {
   const dispatch = useDispatch();
   const { items: budgets, isLoading } = useSelector((state) => state.budgets);
+  const { user } = useSelector((state) => state.auth);
   const [refreshing, setRefreshing] = useState(false);
   const [modalVisible, setModalVisible] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState('Total');
@@ -44,6 +46,7 @@ export default function BudgetScreen() {
   const totalBudget = budgets.find((b) => b.category === 'Total');
   const categoryBudgets = budgets.filter((b) => b.category !== 'Total');
   const unbudgeted = CATEGORIES.filter((c) => !categoryBudgets.find((b) => b.category === c));
+  const currencySymbol = getCurrencySymbol(user?.currency);
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
@@ -63,7 +66,7 @@ export default function BudgetScreen() {
           {totalBudget ? (
             <>
               <Text style={styles.totalCardAmount}>
-                ${totalBudget.spent.toFixed(0)} <Text style={styles.totalCardOf}>of ${totalBudget.amount.toFixed(0)}</Text>
+                {currencySymbol}{totalBudget.spent.toFixed(0)} <Text style={styles.totalCardOf}>of {currencySymbol}{totalBudget.amount.toFixed(0)}</Text>
               </Text>
               <View style={styles.progressTrack}>
                 <View
@@ -86,7 +89,7 @@ export default function BudgetScreen() {
         {/* Category budgets */}
         <Text style={styles.sectionTitle}>By Category</Text>
         {categoryBudgets.map((b) => (
-          <CategoryBudgetCard key={b.id} budget={b} onPress={() => openModal(b.category, b.amount)} />
+          <CategoryBudgetCard key={b.id} budget={b} currencySymbol={currencySymbol} onPress={() => openModal(b.category, b.amount)} />
         ))}
 
         {unbudgeted.length > 0 && (
@@ -111,7 +114,7 @@ export default function BudgetScreen() {
           <View style={styles.modalContent}>
             <Text style={styles.modalTitle}>{selectedCategory} Budget</Text>
             <View style={styles.modalInputRow}>
-              <Text style={styles.modalCurrency}>$</Text>
+              <Text style={styles.modalCurrency}>{currencySymbol}</Text>
               <TextInput
                 style={styles.modalInput}
                 keyboardType="decimal-pad"
@@ -136,7 +139,7 @@ export default function BudgetScreen() {
   );
 }
 
-function CategoryBudgetCard({ budget, onPress }) {
+function CategoryBudgetCard({ budget, currencySymbol, onPress }) {
   const color = CATEGORY_COLORS[budget.category] || COLORS.textSecondary;
   return (
     <TouchableOpacity style={styles.categoryCard} onPress={onPress}>
@@ -148,7 +151,7 @@ function CategoryBudgetCard({ budget, onPress }) {
           <Text style={styles.categoryCardTitle}>{budget.category}</Text>
         </View>
         <Text style={styles.categoryCardAmount}>
-          ${budget.spent.toFixed(0)} / ${budget.amount.toFixed(0)}
+          {currencySymbol}{budget.spent.toFixed(0)} / {currencySymbol}{budget.amount.toFixed(0)}
         </Text>
       </View>
       <View style={styles.progressTrackLight}>
@@ -163,7 +166,7 @@ function CategoryBudgetCard({ budget, onPress }) {
         />
       </View>
       {budget.isOverBudget && (
-        <Text style={styles.overBudgetText}>Over budget by ${(budget.spent - budget.amount).toFixed(2)}</Text>
+        <Text style={styles.overBudgetText}>Over budget by {currencySymbol}{(budget.spent - budget.amount).toFixed(2)}</Text>
       )}
     </TouchableOpacity>
   );

@@ -1,6 +1,7 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, RefreshControl } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import Toast from 'react-native-toast-message';
 import { insightsAPI } from '../services/api';
@@ -30,7 +31,11 @@ export default function InsightsScreen() {
     }
   };
 
-  useEffect(() => { loadInsight(); }, []);
+  useFocusEffect(
+    useCallback(() => {
+      loadInsight();
+    }, [])
+  );
 
   if (isLoading) {
     return (

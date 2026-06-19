@@ -6,6 +6,23 @@ const auth = require("../middleware/auth");
 const router = express.Router();
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
+const CURRENCY_SYMBOLS = {
+  USD: "$",
+  PHP: "\u20b1",
+  EUR: "\u20ac",
+  GBP: "\u00a3",
+  JPY: "\u00a5",
+  INR: "\u20b9",
+  AUD: "A$",
+  CAD: "C$",
+  SGD: "S$",
+  HKD: "HK$",
+  MXN: "$",
+  BRL: "R$",
+};
+
+const getCurrencySymbol = (code = "USD") => CURRENCY_SYMBOLS[code] || code;
+
 // GET /api/insights — fetch or generate for month
 router.get("/", auth, async (req, res) => {
   try {
@@ -13,6 +30,7 @@ router.get("/", auth, async (req, res) => {
     const now = new Date();
     const targetYear = parseInt(year) || now.getFullYear();
     const targetMonth = parseInt(month) || now.getMonth() + 1;
+    const currencySymbol = getCurrencySymbol(req.user?.currency);
 
     // Return cached insight unless refresh requested
     if (refresh !== "true") {
@@ -71,12 +89,12 @@ router.get("/", auth, async (req, res) => {
     const prompt = `You are a personal finance advisor analyzing spending data.
 
 Month: ${targetYear}-${String(targetMonth).padStart(2, "0")}
-Total Spent: $${total.toFixed(2)}
-Previous Month Total: $${prevTotal.toFixed(2)} (${prevTotal > 0 ? (((total - prevTotal) / prevTotal) * 100).toFixed(1) : "N/A"}% change)
+Total Spent: ${currencySymbol}${total.toFixed(2)}
+Previous Month Total: ${currencySymbol}${prevTotal.toFixed(2)} (${prevTotal > 0 ? (((total - prevTotal) / prevTotal) * 100).toFixed(1) : "N/A"}% change)
 Number of Transactions: ${expenses.length}
 
 Category Breakdown:
-${sorted.map(([cat, amt]) => `- ${cat}: $${amt.toFixed(2)} (${((amt / total) * 100).toFixed(1)}%)`).join("\n")}
+${sorted.map(([cat, amt]) => `- ${cat}: ${currencySymbol}${amt.toFixed(2)} (${((amt / total) * 100).toFixed(1)}%)`).join("\n")}
 
 Provide a JSON response with exactly this structure (no markdown, pure JSON):
 {
@@ -104,8 +122,8 @@ Provide a JSON response with exactly this structure (no markdown, pure JSON):
       const categoryNames = sorted.map(([cat]) => cat).join(", ");
       const topCategory = sorted[0]?.[0] || "General";
       parsed = {
-        summary: `You spent $${total.toFixed(2)} this month. Top spending categories: ${topCategory}. (AI insights unavailable - check API key in .env)`,
-        content: `Your spending this month totaled $${total.toFixed(2)} across ${expenses.length} transactions. Key categories: ${categoryNames}. Compare this with previous months to identify trends and set better budgets.`,
+        summary: `You spent ${currencySymbol}${total.toFixed(2)} this month. Top spending categories: ${topCategory}. (AI insights unavailable - check API key in .env)`,
+        content: `Your spending this month totaled ${currencySymbol}${total.toFixed(2)} across ${expenses.length} transactions. Key categories: ${categoryNames}. Compare this with previous months to identify trends and set better budgets.`,
         tips: [
           "Set category-based budgets to control spending",
           "Review subscriptions and recurring charges",

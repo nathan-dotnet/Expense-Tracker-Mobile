@@ -2,26 +2,34 @@ import { Ionicons } from "@expo/vector-icons";
 import { useState } from "react";
 import {
   Alert,
+  ActivityIndicator,
   Modal,
   ScrollView,
   StyleSheet,
+  Switch,
   Text,
+  TextInput,
   TouchableOpacity,
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import Toast from "react-native-toast-message";
 import { useDispatch, useSelector } from "react-redux";
-import { COLORS } from "../constants/theme";
-import { authAPI } from "../services/api";
-import { logout } from "../store/authSlice";
+import { COLORS, PAYMENT_METHODS } from "../constants/theme";
+import { reportsAPI } from "../services/api";
+import { logout, updateProfile } from "../store/authSlice";
 import { CURRENCIES } from "../utils/currency";
 
 export default function ProfileScreen() {
   const dispatch = useDispatch();
   const { user } = useSelector((state) => state.auth);
   const [showCurrencyModal, setShowCurrencyModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [infoModal, setInfoModal] = useState(null);
+  const [nameInput, setNameInput] = useState(user?.name || "");
   const [isUpdating, setIsUpdating] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
 
   const handleLogout = () => {
     Alert.alert("Log Out", "Are you sure you want to log out?", [
@@ -37,7 +45,10 @@ export default function ProfileScreen() {
   const handleCurrencyChange = async (currencyCode) => {
     setIsUpdating(true);
     try {
-      await authAPI.updateProfile({ currency: currencyCode });
+      const result = await dispatch(updateProfile({ currency: currencyCode }));
+      if (result.meta.requestStatus !== "fulfilled") {
+        throw new Error(result.payload || "Failed to update currency");
+      }
       Toast.show({ type: "success", text1: "Currency updated!" });
       setShowCurrencyModal(false);
     } catch (error) {
@@ -47,13 +58,93 @@ export default function ProfileScreen() {
     }
   };
 
+  const handleSaveProfile = async () => {
+    const name = nameInput.trim();
+    if (!name) {
+      return Toast.show({ type: "error", text1: "Name is required" });
+    }
+
+    setIsUpdating(true);
+    try {
+      const result = await dispatch(updateProfile({ name }));
+      if (result.meta.requestStatus !== "fulfilled") {
+        throw new Error(result.payload || "Failed to update profile");
+      }
+      Toast.show({ type: "success", text1: "Profile updated!" });
+      setShowEditModal(false);
+    } catch (error) {
+      Toast.show({ type: "error", text1: "Failed to update profile" });
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
+  const handleToggleNotifications = async (enabled) => {
+    setIsUpdating(true);
+    try {
+      const result = await dispatch(updateProfile({ notificationsEnabled: enabled }));
+      if (result.meta.requestStatus !== "fulfilled") {
+        throw new Error(result.payload || "Failed to update notifications");
+      }
+      Toast.show({
+        type: "success",
+        text1: enabled ? "Notifications enabled" : "Notifications disabled",
+      });
+    } catch (error) {
+      Toast.show({ type: "error", text1: "Failed to update notifications" });
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
+  const handleExportReports = async () => {
+    setIsExporting(true);
+    try {
+      const [monthly, yearly] = await Promise.all([
+        reportsAPI.monthly({ months: 6 }),
+        reportsAPI.yearly({ year: new Date().getFullYear() }),
+      ]);
+      const months = monthly.data.data || [];
+      const year = yearly.data.data;
+      const latest = months[months.length - 1];
+
+      Alert.alert(
+        "Report Ready",
+        `Year ${year.year}: ${year.count} transactions, total ${year.total.toFixed(2)}.\n\nLatest month (${latest?.label || "N/A"}): ${latest?.count || 0} transactions, total ${(latest?.total || 0).toFixed(2)}.`
+      );
+    } catch (error) {
+      Toast.show({ type: "error", text1: "Failed to export reports" });
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
+  const openInfoModal = (type) => {
+    const content = {
+      privacy: {
+        title: "Privacy & Security",
+        body:
+          "Your account is protected with secure authentication. Expense, budget, and report data are only loaded for your signed-in account.",
+      },
+      help: {
+        title: "Help & Support",
+        body:
+          "Use Expenses to add and review spending, Budget to set limits, Insights for AI analysis, and Profile to manage account preferences.",
+      },
+    };
+    setInfoModal(content[type]);
+  };
+
   const MENU_ITEMS = [
-    { icon: "person-outline", label: "Edit Profile" },
-    { icon: "card-outline", label: "Payment Methods" },
-    { icon: "notifications-outline", label: "Notifications" },
-    { icon: "document-text-outline", label: "Export Reports" },
-    { icon: "shield-checkmark-outline", label: "Privacy & Security" },
-    { icon: "help-circle-outline", label: "Help & Support" },
+    { icon: "person-outline", label: "Edit Profile", onPress: () => {
+      setNameInput(user?.name || "");
+      setShowEditModal(true);
+    } },
+    { icon: "card-outline", label: "Payment Methods", onPress: () => setShowPaymentModal(true) },
+    { icon: "notifications-outline", label: "Notifications", isSwitch: true },
+    { icon: "document-text-outline", label: "Export Reports", onPress: handleExportReports, loading: isExporting },
+    { icon: "shield-checkmark-outline", label: "Privacy & Security", onPress: () => openInfoModal("privacy") },
+    { icon: "help-circle-outline", label: "Help & Support", onPress: () => openInfoModal("help") },
   ];
 
   return (
@@ -88,6 +179,8 @@ export default function ProfileScreen() {
                 styles.menuRow,
                 i < MENU_ITEMS.length - 1 && styles.menuRowBorder,
               ]}
+              onPress={item.onPress}
+              disabled={item.isSwitch || item.loading}
             >
               <Ionicons
                 name={item.icon}
@@ -96,11 +189,23 @@ export default function ProfileScreen() {
                 style={{ marginRight: 14 }}
               />
               <Text style={styles.menuLabel}>{item.label}</Text>
-              <Ionicons
-                name="chevron-forward"
-                size={18}
-                color={COLORS.border}
-              />
+              {item.loading ? (
+                <ActivityIndicator size="small" color={COLORS.primary} />
+              ) : item.isSwitch ? (
+                <Switch
+                  value={user?.notificationsEnabled !== false}
+                  onValueChange={handleToggleNotifications}
+                  disabled={isUpdating}
+                  trackColor={{ false: COLORS.border, true: `${COLORS.primary}55` }}
+                  thumbColor={user?.notificationsEnabled !== false ? COLORS.primary : COLORS.white}
+                />
+              ) : (
+                <Ionicons
+                  name="chevron-forward"
+                  size={18}
+                  color={COLORS.border}
+                />
+              )}
             </TouchableOpacity>
           ))}
         </View>
@@ -160,6 +265,98 @@ export default function ProfileScreen() {
                 </TouchableOpacity>
               ))}
             </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal
+        visible={showEditModal}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowEditModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Edit Profile</Text>
+              <TouchableOpacity onPress={() => setShowEditModal(false)}>
+                <Ionicons name="close" size={24} color={COLORS.text} />
+              </TouchableOpacity>
+            </View>
+            <View style={styles.formContent}>
+              <Text style={styles.inputLabel}>Name</Text>
+              <TextInput
+                style={styles.textInput}
+                value={nameInput}
+                onChangeText={setNameInput}
+                placeholder="Your name"
+                placeholderTextColor={COLORS.textSecondary}
+              />
+              <TouchableOpacity
+                style={styles.secondaryRow}
+                onPress={() => setShowCurrencyModal(true)}
+              >
+                <Text style={styles.secondaryRowText}>Currency</Text>
+                <Text style={styles.secondaryRowValue}>{user?.currency || "USD"}</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.saveButton, isUpdating && styles.disabledButton]}
+                onPress={handleSaveProfile}
+                disabled={isUpdating}
+              >
+                {isUpdating ? (
+                  <ActivityIndicator color={COLORS.white} />
+                ) : (
+                  <Text style={styles.saveButtonText}>Save Changes</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal
+        visible={showPaymentModal}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowPaymentModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Payment Methods</Text>
+              <TouchableOpacity onPress={() => setShowPaymentModal(false)}>
+                <Ionicons name="close" size={24} color={COLORS.text} />
+              </TouchableOpacity>
+            </View>
+            <View style={styles.formContent}>
+              {PAYMENT_METHODS.map((method) => (
+                <View key={method.value} style={styles.paymentRow}>
+                  <Ionicons name="card-outline" size={20} color={COLORS.primary} />
+                  <Text style={styles.paymentLabel}>{method.label}</Text>
+                </View>
+              ))}
+              <Text style={styles.helperText}>
+                Choose a payment method when adding or editing an expense.
+              </Text>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal
+        visible={!!infoModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setInfoModal(null)}
+      >
+        <View style={styles.centerModalOverlay}>
+          <View style={styles.infoCard}>
+            <Text style={styles.modalTitle}>{infoModal?.title}</Text>
+            <Text style={styles.infoText}>{infoModal?.body}</Text>
+            <TouchableOpacity style={styles.saveButton} onPress={() => setInfoModal(null)}>
+              <Text style={styles.saveButtonText}>Done</Text>
+            </TouchableOpacity>
           </View>
         </View>
       </Modal>
@@ -285,5 +482,102 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: "600",
     color: COLORS.primary,
+  },
+  formContent: {
+    padding: 20,
+  },
+  inputLabel: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: COLORS.text,
+    marginBottom: 8,
+  },
+  textInput: {
+    height: 50,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    backgroundColor: COLORS.card,
+    paddingHorizontal: 14,
+    fontSize: 15,
+    color: COLORS.text,
+    marginBottom: 14,
+  },
+  secondaryRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    minHeight: 50,
+    borderRadius: 12,
+    backgroundColor: COLORS.card,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    paddingHorizontal: 14,
+    marginBottom: 18,
+  },
+  secondaryRowText: {
+    fontSize: 14,
+    color: COLORS.text,
+    fontWeight: "500",
+  },
+  secondaryRowValue: {
+    fontSize: 13,
+    color: COLORS.primary,
+    fontWeight: "700",
+  },
+  saveButton: {
+    height: 50,
+    borderRadius: 12,
+    backgroundColor: COLORS.primary,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  disabledButton: {
+    opacity: 0.7,
+  },
+  saveButtonText: {
+    color: COLORS.white,
+    fontWeight: "700",
+    fontSize: 15,
+  },
+  paymentRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: COLORS.card,
+    borderRadius: 12,
+    padding: 14,
+    marginBottom: 10,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+  paymentLabel: {
+    marginLeft: 12,
+    fontSize: 14,
+    fontWeight: "500",
+    color: COLORS.text,
+  },
+  helperText: {
+    color: COLORS.textSecondary,
+    fontSize: 12,
+    lineHeight: 18,
+    marginTop: 4,
+  },
+  centerModalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0, 0, 0, 0.45)",
+    justifyContent: "center",
+    padding: 24,
+  },
+  infoCard: {
+    backgroundColor: COLORS.card,
+    borderRadius: 16,
+    padding: 20,
+  },
+  infoText: {
+    color: COLORS.textSecondary,
+    fontSize: 14,
+    lineHeight: 21,
+    marginTop: 12,
+    marginBottom: 20,
   },
 });

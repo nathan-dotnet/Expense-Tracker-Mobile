@@ -89,6 +89,9 @@ router.patch('/profile', auth, async (req, res) => {
       data,
       select: { id: true, name: true, email: true, currency: true, notificationsEnabled: true },
     });
+    if (currency !== undefined && currency !== req.user.currency) {
+      await prisma.insight.deleteMany({ where: { userId: req.userId } });
+    }
     res.json({ success: true, user });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
